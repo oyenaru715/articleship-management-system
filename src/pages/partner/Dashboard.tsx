@@ -1,0 +1,242 @@
+import React, { useState } from 'react';
+
+const PartnerDashboard: React.FC<{ navigate?: (page: string) => void }> = ({ navigate }) => {
+  const [activeMetric, setActiveMetric] = useState('all');
+
+  const sidebarItems = [
+    { icon: '📊', label: 'Dashboard', active: true, page: 'partner-dashboard' },
+    { icon: '✅', label: 'Approvals', active: false, page: 'partner-approvals' },
+    { icon: '📈', label: 'Reports', active: false, page: 'partner-reports' },
+  ];
+
+  const articles = [
+    { id: 1, name: 'Naresh Manoj Agrawal', joinDate: '01 Sep 2025', year: 1, progress: 38, status: 'Active', balance: { leaves: 4, compoff: 1 } },
+    { id: 2, name: 'Priyanka Sharma', joinDate: '15 Sep 2025', year: 1, progress: 35, status: 'Active', balance: { leaves: 3, compoff: 0 } },
+    { id: 3, name: 'Rohan Patel', joinDate: '01 Sep 2024', year: 2, progress: 85, status: 'Active', balance: { leaves: 6, compoff: 2 } },
+    { id: 4, name: 'Isha Desai', joinDate: '10 Oct 2024', year: 2, progress: 78, status: 'Active', balance: { leaves: 7, compoff: 1 } },
+    { id: 5, name: 'Vikram Singh', joinDate: '01 Sep 2023', year: 3, progress: 100, status: 'Completed', balance: { leaves: 0, compoff: 0 } },
+  ];
+
+  const pendingApprovals = [
+    { id: 1, article: 'Naresh Manoj Agrawal', type: 'Leave', days: 2, reason: 'Family function', appliedOn: '07 Jun 2026', status: 'Pending - Senior', stage: 1 },
+    { id: 2, article: 'Priyanka Sharma', type: 'Comp-Off', days: 1, reason: 'Worked Sunday', appliedOn: '06 Jun 2026', status: 'Pending - Partner', stage: 2 },
+    { id: 3, article: 'Rohan Patel', type: 'Leave', days: 1, reason: 'Medical', appliedOn: '05 Jun 2026', status: 'Pending - Senior', stage: 1 },
+    { id: 4, article: 'Isha Desai', type: 'Comp-Off', days: 1, reason: 'Worked 2nd Saturday', appliedOn: '04 Jun 2026', status: 'Pending - Partner', stage: 2 },
+  ];
+
+  const stats = [
+    { label: 'Total Articles', value: 5, icon: '👥', color: '#1e3a5f', bg: '#f0f4ff' },
+    { label: 'Active', value: 4, icon: '✅', color: '#16a34a', bg: '#dcfce7' },
+    { label: 'Completed', value: 1, icon: '🎓', color: '#7c3aed', bg: '#ede9fe' },
+    { label: 'Pending for Me', value: 2, icon: '⏳', color: '#d4a017', bg: '#fef3c7' },
+    { label: 'Avg Attendance %', value: '94', icon: '📊', color: '#0891b2', bg: '#cffafe' },
+    { label: 'Compliance Score', value: '92%', icon: '✅', color: '#16a34a', bg: '#dcfce7' },
+  ];
+
+  return (
+    <div className="min-h-screen" style={{ background: '#f0f4ff' }}>
+
+      {/* Top Navigation */}
+      <nav style={{ background: 'linear-gradient(135deg, #0f1f35, #1e3a5f)' }} className="px-6 py-4 flex items-center justify-between shadow-lg">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)' }}>
+            <span className="text-white font-bold text-sm">D&L</span>
+          </div>
+          <div>
+            <h1 className="text-white font-bold text-lg">Dayal & Lohia</h1>
+            <p className="text-xs" style={{ color: '#f5c842' }}>Partner Portal</p>
+          </div>
+        </div>
+        <div className="flex items-center space-x-4">
+          <div className="text-right">
+            <p className="text-white font-medium text-sm">Partner</p>
+            <p className="text-xs" style={{ color: '#f5c842' }}>Dayal & Lohia, CA</p>
+          </div>
+          <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold" style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)' }}>
+            PA
+          </div>
+        </div>
+      </nav>
+
+      <div className="flex">
+
+        {/* Sidebar */}
+        <aside className="w-64 min-h-screen shadow-lg" style={{ background: '#0f1f35' }}>
+          <div className="p-4 space-y-1 mt-4">
+            {sidebarItems.map((item) => (
+              <div
+                key={item.label}
+                onClick={() => navigate && navigate(item.page)}
+                className="flex items-center space-x-3 px-4 py-3 rounded-lg cursor-pointer transition-all"
+                style={{
+                  background: item.active ? 'linear-gradient(135deg, #d4a017, #f5c842)' : 'transparent',
+                  color: item.active ? '#0f1f35' : '#94a3b8',
+                }}
+              >
+                <span>{item.icon}</span>
+                <span className="font-medium text-sm">{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 p-6 space-y-6">
+
+          {/* Header */}
+          <div>
+            <h2 className="text-3xl font-bold" style={{ color: '#0f1f35' }}>📊 Partner Dashboard</h2>
+            <p className="text-gray-500 text-sm">Overview of all articles and pending approvals requiring your action</p>
+          </div>
+
+          {/* Key Metrics */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {stats.map((stat) => (
+              <div key={stat.label} className="rounded-xl p-4 text-center shadow-md" style={{ background: stat.bg }}>
+                <p className="text-2xl mb-2">{stat.icon}</p>
+                <p className="text-2xl font-bold" style={{ color: stat.color }}>{stat.value}</p>
+                <p className="text-xs text-gray-600 mt-1">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Pending Approvals Alert */}
+          <div className="rounded-xl p-4 border-l-4" style={{ background: '#fef3c7', borderColor: '#d97706' }}>
+            <p className="font-bold text-amber-800">⚠️ 2 Approvals Pending Your Action</p>
+            <p className="text-amber-700 text-sm mt-1">Priyanka Sharma's Comp-Off and Isha Desai's Comp-Off are awaiting your final approval.</p>
+          </div>
+
+          {/* Two Column Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            {/* Pending Approvals Requiring Action */}
+            <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100" style={{ background: '#f0f4ff' }}>
+                <h3 className="font-bold text-lg" style={{ color: '#0f1f35' }}>⏳ Awaiting Your Approval (2)</h3>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {pendingApprovals.filter(a => a.status === 'Pending - Partner').map((approval) => (
+                  <div key={approval.id} className="p-4 hover:bg-blue-50 transition-all cursor-pointer">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="font-medium text-gray-800">{approval.article}</p>
+                        <p className="text-xs text-gray-500">{approval.type} • {approval.days} day{approval.days > 1 ? 's' : ''}</p>
+                      </div>
+                      <span className="px-2 py-1 rounded-full text-xs font-bold" style={{ background: '#fef3c7', color: '#d4a017' }}>
+                        Action Needed
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400 mb-2">{approval.reason}</p>
+                    <button className="text-xs font-medium px-3 py-1 rounded-lg text-white transition-all hover:shadow-md" style={{ background: 'linear-gradient(135deg, #1e3a5f, #162d4a)' }}>
+                      Review & Approve
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="px-6 py-3 border-t border-gray-100 text-center">
+                <button className="text-sm font-medium" style={{ color: '#1e3a5f' }}>View All Pending →</button>
+              </div>
+            </div>
+
+            {/* Articles Overview */}
+            <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100" style={{ background: '#f0f4ff' }}>
+                <h3 className="font-bold text-lg" style={{ color: '#0f1f35' }}>👥 Articles Overview (5)</h3>
+              </div>
+              <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+                {articles.map((article) => (
+                  <div key={article.id} className="p-4 hover:bg-blue-50 transition-all cursor-pointer">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="font-medium text-gray-800">{article.name}</p>
+                        <p className="text-xs text-gray-500">Year {article.year} • Joined {article.joinDate}</p>
+                      </div>
+                      <span
+                        className="px-3 py-1 rounded-full text-xs font-bold"
+                        style={{
+                          background: article.status === 'Active' ? '#dcfce7' : '#ede9fe',
+                          color: article.status === 'Active' ? '#16a34a' : '#7c3aed'
+                        }}
+                      >
+                        {article.status}
+                      </span>
+                    </div>
+                    <div className="mb-2">
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-gray-600">Progress</span>
+                        <span className="font-bold" style={{ color: '#1e3a5f' }}>{article.progress}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-1.5">
+                        <div
+                          className="h-1.5 rounded-full transition-all"
+                          style={{
+                            width: `${article.progress}%`,
+                            background: 'linear-gradient(135deg, #d4a017, #f5c842)'
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+                    <div className="flex space-x-3 text-xs">
+                      <span style={{ color: '#16a34a' }}>Leaves: {article.balance.leaves}</span>
+                      <span style={{ color: '#0891b2' }}>Comp-Off: {article.balance.compoff}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="px-6 py-3 border-t border-gray-100 text-center">
+                <button className="text-sm font-medium" style={{ color: '#1e3a5f' }}>View All →</button>
+              </div>
+            </div>
+
+          </div>
+
+          {/* All Approvals Table */}
+          <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100" style={{ background: '#f0f4ff' }}>
+              <h3 className="font-bold text-lg" style={{ color: '#0f1f35' }}>📋 All Requests</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ background: '#f9fafb' }}>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-700">Article Name</th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-700">Type</th>
+                    <th className="text-center px-6 py-3 font-semibold text-gray-700">Days</th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-700">Reason</th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-700">Applied On</th>
+                    <th className="text-center px-6 py-3 font-semibold text-gray-700">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingApprovals.map((approval, i) => (
+                    <tr key={approval.id} className="border-b border-gray-100" style={{ background: i % 2 === 0 ? 'white' : '#f9fafb' }}>
+                      <td className="px-6 py-4 text-gray-800 font-medium">{approval.article}</td>
+                      <td className="px-6 py-4 text-gray-600">{approval.type}</td>
+                      <td className="px-6 py-4 text-center font-bold" style={{ color: '#1e3a5f' }}>{approval.days}</td>
+                      <td className="px-6 py-4 text-gray-600 text-xs">{approval.reason}</td>
+                      <td className="px-6 py-4 text-gray-500 text-xs">{approval.appliedOn}</td>
+                      <td className="px-6 py-4 text-center">
+                        <span
+                          className="px-3 py-1 rounded-full text-xs font-bold"
+                          style={{
+                            background: approval.status.includes('Senior') ? '#fef3c7' : '#fee2e2',
+                            color: approval.status.includes('Senior') ? '#d4a017' : '#dc2626'
+                          }}
+                        >
+                          {approval.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export default PartnerDashboard;

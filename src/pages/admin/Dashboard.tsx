@@ -3,13 +3,14 @@ import React, { useState } from 'react';
 const AdminDashboard: React.FC<{ navigate?: (page: string) => void }> = ({ navigate }) => {
   const [activeMetric, setActiveMetric] = useState('all');
 
-  const sidebarItems = [
-    { icon: '📊', label: 'Dashboard', active: true, page: 'admin-dashboard' },
-    { icon: '👥', label: 'Articles', active: false, page: 'admin-articles' },
-    { icon: '✅', label: 'Approvals', active: false, page: 'admin-approvals' },
-    { icon: '📈', label: 'Reports', active: false, page: 'admin-reports' },
-    { icon: '⚙️', label: 'Settings', active: false, page: 'admin-settings' },
-  ];
+const sidebarItems = [
+  { icon: '📊', label: 'Dashboard', active: true, page: 'admin-dashboard' },
+  { icon: '👥', label: 'Articles', active: false, page: 'admin-articles' },
+  { icon: '✅', label: 'Approvals', active: false, page: 'admin-approvals' },
+  { icon: '📈', label: 'Reports', active: false, page: 'admin-reports' },
+  { icon: '⚙️', label: 'Settings', active: false, page: 'admin-settings' },
+  { icon: '👤', label: 'User Management', active: false, page: 'admin-users' },
+];
 
   const articles = [
     { id: 1, name: 'Naresh Manoj Agrawal', joinDate: '01 Sep 2025', year: 1, progress: 38, status: 'Active', balance: { leaves: 4, compoff: 1 } },
@@ -50,14 +51,21 @@ const AdminDashboard: React.FC<{ navigate?: (page: string) => void }> = ({ navig
           </div>
         </div>
         <div className="flex items-center space-x-4">
-          <div className="text-right">
-            <p className="text-white font-medium text-sm">Admin User</p>
-            <p className="text-xs" style={{ color: '#f5c842' }}>Dayal & Lohia, CA</p>
-          </div>
-          <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold" style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)' }}>
-            AD
-          </div>
-        </div>
+  <div className="text-right">
+    <p className="text-white font-medium text-sm">Admin User</p>
+    <p className="text-xs" style={{ color: '#f5c842' }}>Dayal & Lohia, CA</p>
+  </div>
+  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold" style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)' }}>
+    AD
+  </div>
+  <button
+    onClick={() => navigate && navigate('login')}
+    className="px-4 py-2 rounded-lg text-white font-semibold transition-all hover:shadow-md"
+    style={{ background: '#ef4444' }}
+  >
+    🚪 Logout
+  </button>
+</div>
       </nav>
 
       <div className="flex">

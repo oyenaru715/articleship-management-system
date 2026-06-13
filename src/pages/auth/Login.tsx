@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
 
-const Login: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => {
+const Login: React.FC<{ onLogin?: (role: string) => void }> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('article');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      if (onLogin) onLogin();
-    }, 2000);
-  };
+const handleLogin = (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+  setTimeout(() => {
+    setLoading(false);
+    if (onLogin) onLogin(role);
+  }, 2000);
+};
 
   return (
     <div className="min-h-screen flex" style={{ background: 'linear-gradient(135deg, #0f1f35 0%, #1e3a5f 50%, #162d4a 100%)' }}>
@@ -92,7 +92,7 @@ const Login: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Login As</label>
                 <div className="grid grid-cols-3 gap-2">
-                  {['article', 'partner', 'admin'].map((r) => (
+                  {['article', 'senior', 'partner', 'admin'].map((r) => (
                     <button
                       key={r}
                       type="button"
@@ -104,7 +104,7 @@ const Login: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => {
                       }`}
                       style={role === r ? { background: 'linear-gradient(135deg, #1e3a5f, #162d4a)' } : {}}
                     >
-                      {r === 'article' ? 'Article' : r === 'partner' ? 'Partner' : 'Admin'}
+                      {r === 'article' ? 'Article' : r === 'senior' ? 'Senior' : r === 'partner' ? 'Partner' : 'Admin'}
                     </button>
                   ))}
                 </div>

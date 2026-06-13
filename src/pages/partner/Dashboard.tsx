@@ -48,14 +48,21 @@ const PartnerDashboard: React.FC<{ navigate?: (page: string) => void }> = ({ nav
           </div>
         </div>
         <div className="flex items-center space-x-4">
-          <div className="text-right">
-            <p className="text-white font-medium text-sm">Partner</p>
-            <p className="text-xs" style={{ color: '#f5c842' }}>Dayal & Lohia, CA</p>
-          </div>
-          <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold" style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)' }}>
-            PA
-          </div>
-        </div>
+  <div className="text-right">
+    <p className="text-white font-medium text-sm">Partner</p>
+    <p className="text-xs" style={{ color: '#f5c842' }}>Dayal & Lohia, CA</p>
+  </div>
+  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold" style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)' }}>
+    PA
+  </div>
+  <button
+    onClick={() => navigate && navigate('login')}
+    className="px-4 py-2 rounded-lg text-white font-semibold transition-all hover:shadow-md"
+    style={{ background: '#ef4444' }}
+  >
+    🚪 Logout
+  </button>
+</div>
       </nav>
 
       <div className="flex">

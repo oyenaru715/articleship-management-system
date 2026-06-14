@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../../services/supabase';
 
 const Attendance: React.FC<{ navigate?: (page: string) => void }> = ({ navigate }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -9,93 +10,150 @@ const Attendance: React.FC<{ navigate?: (page: string) => void }> = ({ navigate 
   const [clientAddress, setClientAddress] = useState('');
   const [locationChecking, setLocationChecking] = useState(false);
   const [locationStatus, setLocationStatus] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState(5);
-  const [selectedYear, setSelectedYear] = useState(2026);
+  const [attendanceData, setAttendanceData] = useState<{ [key: number]: { status: string; color: string } }>({});
+  const [monthlySummary, setMonthlySummary] = useState({ present: 0, leave: 0, clientVisit: 0, weekOff: 0, absent: 0, workingDays: 0 });
+  const [loading, setLoading] = useState(false);
 
+  const user = JSON.parse(localStorage.getItem('ams_user') || '{}');
   const CUTOFF_HOUR = 11;
   const isHalfDayZone = currentTime.getHours() >= CUTOFF_HOUR;
+
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const adjustedFirstDay = firstDay === 0 ? 6 : firstDay - 1;
+
+  const monthName = today.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  };
+  useEffect(() => {
+    fetchAttendance();
+    checkTodayAttendance();
+  }, []);
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  };
+  const fetchAttendance = async () => {
+    if (!user.id) return;
+    const startOfMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
+    const endOfMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${daysInMonth}`;
 
-  const handleMarkPresent = () => {
-    setShowQR(true);
-  };
+    const { data } = await supabase
+      .from('attendance')
+      .select('*')
+      .eq('user_id', user.id)
+      .gte('date', startOfMonth)
+      .lte('date', endOfMonth);
 
-  const handleQRScanned = () => {
-    setAttendanceMarked(true);
-    setAttendanceType(isHalfDayZone ? 'Half Day (Pending Approval)' : 'Present');
-    setShowQR(false);
-    if (isHalfDayZone) {
-      alert('⚠️ You have marked attendance after 11:00 AM. This has been recorded as Half Day and sent to Partner/Admin for approval.');
+    if (data) {
+      const calData: { [key: number]: { status: string; color: string } } = {};
+      let present = 0, leave = 0, clientVisit = 0, absent = 0;
+
+      data.forEach((record: any) => {
+        const day = new Date(record.date).getDate();
+        const statusMap: { [key: string]: { status: string; color: string } } = {
+          present: { status: 'P', color: '#16a34a' },
+          half_day: { status: 'HD', color: '#d4a017' },
+          absent: { status: 'A', color: '#dc2626' },
+          comp_off: { status: 'CO', color: '#7c3aed' },
+        };
+        calData[day] = statusMap[record.status] || { status: 'P', color: '#16a34a' };
+
+        if (record.status === 'present') present++;
+        else if (record.status === 'absent') absent++;
+        else if (record.status === 'half_day') clientVisit++;
+      });
+
+      // Add weekends
+      for (let d = 1; d <= daysInMonth; d++) {
+        const date = new Date(currentYear, currentMonth, d);
+        const dow = date.getDay();
+        if (dow === 0 || dow === 6) {
+          if (!calData[d]) calData[d] = { status: 'WO', color: '#94a3b8' };
+        }
+      }
+
+      setAttendanceData(calData);
+      const weekOffs = Object.values(calData).filter(v => v.status === 'WO').length;
+      setMonthlySummary({
+        present,
+        leave,
+        clientVisit,
+        weekOff: weekOffs,
+        absent,
+        workingDays: daysInMonth - weekOffs,
+      });
     }
   };
 
-  const handleClientLocation = () => {
-    setShowClientLocation(true);
+  const checkTodayAttendance = async () => {
+    if (!user.id) return;
+    const todayStr = today.toISOString().split('T')[0];
+    const { data } = await supabase
+      .from('attendance')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('date', todayStr)
+      .single();
+
+    if (data) {
+      setAttendanceMarked(true);
+      setAttendanceType(data.status === 'present' ? 'Present' : data.status === 'half_day' ? 'Half Day' : data.status);
+    }
   };
 
-  const handleGPSCheck = () => {
+  const markAttendance = async (status: string, type: string) => {
+    if (!user.id) return;
+    setLoading(true);
+    const todayStr = today.toISOString().split('T')[0];
+
+    const { error } = await supabase
+      .from('attendance')
+      .insert([{
+        user_id: user.id,
+        date: todayStr,
+        status,
+        marked_by: user.id,
+      }]);
+
+    if (!error) {
+      setAttendanceMarked(true);
+      setAttendanceType(type);
+      fetchAttendance();
+    }
+    setLoading(false);
+  };
+
+  const formatTime = (date: Date) => date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const formatDate = (date: Date) => date.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  const handleMarkPresent = () => setShowQR(true);
+
+  const handleQRScanned = async () => {
+    setShowQR(false);
+    const status = isHalfDayZone ? 'half_day' : 'present';
+    const type = isHalfDayZone ? 'Half Day (Pending Approval)' : 'Present';
+    await markAttendance(status, type);
+    if (isHalfDayZone) alert('⚠️ You have marked attendance after 11:00 AM. Recorded as Half Day.');
+  };
+
+  const handleGPSCheck = async () => {
     setLocationChecking(true);
     setLocationStatus('Checking your location...');
-    setTimeout(() => {
+    setTimeout(async () => {
       setLocationStatus('✅ Location verified! Within 100 meters of client site.');
-      setTimeout(() => {
-        setAttendanceMarked(true);
-        setAttendanceType('Client Visit');
+      setTimeout(async () => {
+        await markAttendance('present', 'Client Visit');
         setShowClientLocation(false);
         setLocationChecking(false);
         setLocationStatus('');
       }, 1500);
     }, 2000);
   };
-
-  // Calendar Data
-  const attendanceData: { [key: number]: { status: string; color: string } } = {
-    1: { status: 'P', color: '#16a34a' },
-    2: { status: 'P', color: '#16a34a' },
-    3: { status: 'P', color: '#16a34a' },
-    4: { status: 'WO', color: '#94a3b8' },
-    5: { status: 'P', color: '#16a34a' },
-    6: { status: 'P', color: '#16a34a' },
-    7: { status: 'L', color: '#d4a017' },
-    8: { status: 'P', color: '#16a34a' },
-    9: { status: 'P', color: '#16a34a' },
-    10: { status: 'P', color: '#16a34a' },
-    11: { status: 'WO', color: '#94a3b8' },
-    12: { status: 'P', color: '#16a34a' },
-    13: { status: 'P', color: '#16a34a' },
-    14: { status: 'CV', color: '#1e3a5f' },
-    15: { status: 'CV', color: '#1e3a5f' },
-    16: { status: 'P', color: '#16a34a' },
-    17: { status: 'P', color: '#16a34a' },
-    18: { status: 'WO', color: '#94a3b8' },
-    19: { status: 'P', color: '#16a34a' },
-    20: { status: 'P', color: '#16a34a' },
-    21: { status: 'P', color: '#16a34a' },
-    22: { status: 'P', color: '#16a34a' },
-    23: { status: 'P', color: '#16a34a' },
-    24: { status: 'P', color: '#16a34a' },
-    25: { status: 'WO', color: '#94a3b8' },
-    26: { status: 'P', color: '#16a34a' },
-    27: { status: 'P', color: '#16a34a' },
-    28: { status: 'P', color: '#16a34a' },
-    29: { status: 'P', color: '#16a34a' },
-    30: { status: 'P', color: '#16a34a' },
-  };
-
-  const daysInMonth = 30;
-  const firstDay = 0; // June 2026 starts on Monday
 
   return (
     <div className="min-h-screen" style={{ background: '#f0f4ff' }}>
@@ -113,11 +171,11 @@ const Attendance: React.FC<{ navigate?: (page: string) => void }> = ({ navigate 
         </div>
         <div className="flex items-center space-x-4">
           <div className="text-right">
-            <p className="text-white font-medium text-sm">Naresh Agrawal</p>
+            <p className="text-white font-medium text-sm">{user.name || 'Article'}</p>
             <p className="text-xs" style={{ color: '#f5c842' }}>Article Assistant</p>
           </div>
           <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold" style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)' }}>
-            NA
+            {user.name ? user.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() : 'AR'}
           </div>
         </div>
       </nav>
@@ -127,16 +185,17 @@ const Attendance: React.FC<{ navigate?: (page: string) => void }> = ({ navigate 
         <aside className="w-64 min-h-screen shadow-lg" style={{ background: '#0f1f35' }}>
           <div className="p-4 space-y-1 mt-4">
             {[
-              { icon: '🏠', label: 'Dashboard', active: false },
-              { icon: '📅', label: 'Attendance', active: true },
-              { icon: '🌿', label: 'Leave', active: false },
-              { icon: '🔄', label: 'Comp-Off', active: false },
-              { icon: '📄', label: 'Documents', active: false },
-              { icon: '💰', label: 'Stipend', active: false },
-              { icon: '👤', label: 'My Profile', active: false },
+              { icon: '🏠', label: 'Dashboard', active: false, page: 'dashboard' },
+              { icon: '📅', label: 'Attendance', active: true, page: 'attendance' },
+              { icon: '🌿', label: 'Leave', active: false, page: 'leave' },
+              { icon: '🔄', label: 'Comp-Off', active: false, page: 'compoff' },
+              { icon: '📄', label: 'Documents', active: false, page: 'documents' },
+              { icon: '💰', label: 'Stipend', active: false, page: 'stipend' },
+              { icon: '👤', label: 'My Profile', active: false, page: 'profile' },
             ].map((item) => (
               <div
                 key={item.label}
+                onClick={() => navigate && navigate(item.page)}
                 className="flex items-center space-x-3 px-4 py-3 rounded-lg cursor-pointer transition-all"
                 style={{
                   background: item.active ? 'linear-gradient(135deg, #d4a017, #f5c842)' : 'transparent',
@@ -156,7 +215,7 @@ const Attendance: React.FC<{ navigate?: (page: string) => void }> = ({ navigate 
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold" style={{ color: '#0f1f35' }}>Attendance</h2>
+              <h2 className="text-2xl font-bold" style={{ color: '#0f1f35' }}>📅 Attendance</h2>
               <p className="text-gray-500 text-sm">{formatDate(currentTime)}</p>
             </div>
             <div className="text-right bg-white rounded-xl px-6 py-3 shadow-md">
@@ -171,7 +230,7 @@ const Attendance: React.FC<{ navigate?: (page: string) => void }> = ({ navigate 
           {isHalfDayZone && !attendanceMarked && (
             <div className="rounded-xl p-4 border-l-4" style={{ background: '#fef3c7', borderColor: '#d97706' }}>
               <p className="font-bold text-amber-800">⚠️ Cut-off Time Passed</p>
-              <p className="text-amber-700 text-sm mt-1">It is past 11:00 AM. Marking attendance now will be recorded as <strong>Half Day</strong> and sent to Partner/Admin for approval.</p>
+              <p className="text-amber-700 text-sm mt-1">It is past 11:00 AM. Marking attendance now will be recorded as <strong>Half Day</strong>.</p>
             </div>
           )}
 
@@ -180,35 +239,25 @@ const Attendance: React.FC<{ navigate?: (page: string) => void }> = ({ navigate 
             <div className="bg-white rounded-2xl shadow-md p-6">
               <h3 className="text-lg font-bold mb-4" style={{ color: '#0f1f35' }}>📍 Mark Today's Attendance</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-                {/* Office QR */}
-                <button
-                  onClick={handleMarkPresent}
+                <button onClick={handleMarkPresent} disabled={loading}
                   className="rounded-xl p-6 text-center transition-all hover:shadow-lg hover:scale-105 border-2"
-                  style={{ borderColor: '#1e3a5f', background: '#f0f4ff' }}
-                >
+                  style={{ borderColor: '#1e3a5f', background: '#f0f4ff' }}>
                   <p className="text-4xl mb-3">📷</p>
                   <p className="font-bold" style={{ color: '#1e3a5f' }}>Scan Office QR</p>
                   <p className="text-xs text-gray-500 mt-1">For office attendance</p>
                 </button>
 
-                {/* Client Location */}
-                <button
-                  onClick={handleClientLocation}
+                <button onClick={() => setShowClientLocation(true)} disabled={loading}
                   className="rounded-xl p-6 text-center transition-all hover:shadow-lg hover:scale-105 border-2"
-                  style={{ borderColor: '#d4a017', background: '#fffbeb' }}
-                >
+                  style={{ borderColor: '#d4a017', background: '#fffbeb' }}>
                   <p className="text-4xl mb-3">📍</p>
                   <p className="font-bold" style={{ color: '#d4a017' }}>Client Location</p>
                   <p className="text-xs text-gray-500 mt-1">GPS within 100m radius</p>
                 </button>
 
-                {/* Work From Home */}
-                <button
-                  onClick={() => { setAttendanceMarked(true); setAttendanceType('Work From Home'); }}
+                <button onClick={() => markAttendance('present', 'Work From Home')} disabled={loading}
                   className="rounded-xl p-6 text-center transition-all hover:shadow-lg hover:scale-105 border-2"
-                  style={{ borderColor: '#7c3aed', background: '#f5f3ff' }}
-                >
+                  style={{ borderColor: '#7c3aed', background: '#f5f3ff' }}>
                   <p className="text-4xl mb-3">🏠</p>
                   <p className="font-bold" style={{ color: '#7c3aed' }}>Work From Home</p>
                   <p className="text-xs text-gray-500 mt-1">Remote work attendance</p>
@@ -244,12 +293,6 @@ const Attendance: React.FC<{ navigate?: (page: string) => void }> = ({ navigate 
                     <p className="text-xs text-gray-500 mt-2">Point camera at QR</p>
                   </div>
                 </div>
-                {/* Simulated QR */}
-                <div className="grid grid-cols-8 gap-1 w-32 mx-auto mb-4">
-                  {Array.from({ length: 64 }).map((_, i) => (
-                    <div key={i} className="w-3 h-3 rounded-sm" style={{ background: Math.random() > 0.5 ? '#0f1f35' : 'white' }}></div>
-                  ))}
-                </div>
                 <p className="text-sm text-gray-500 mb-4">Dayal & Lohia Office — Mumbai</p>
                 <div className="flex space-x-3">
                   <button onClick={() => setShowQR(false)} className="flex-1 py-2 rounded-lg border border-gray-300 text-gray-600">Cancel</button>
@@ -281,12 +324,9 @@ const Attendance: React.FC<{ navigate?: (page: string) => void }> = ({ navigate 
                 )}
                 <div className="flex space-x-3">
                   <button onClick={() => setShowClientLocation(false)} className="flex-1 py-2 rounded-lg border border-gray-300 text-gray-600">Cancel</button>
-                  <button
-                    onClick={handleGPSCheck}
-                    disabled={locationChecking || !clientAddress}
+                  <button onClick={handleGPSCheck} disabled={locationChecking || !clientAddress}
                     className="flex-1 py-2 rounded-lg text-white font-bold disabled:opacity-50"
-                    style={{ background: '#d4a017' }}
-                  >
+                    style={{ background: '#d4a017' }}>
                     {locationChecking ? 'Checking...' : '📍 Verify Location'}
                   </button>
                 </div>
@@ -297,12 +337,11 @@ const Attendance: React.FC<{ navigate?: (page: string) => void }> = ({ navigate 
           {/* Attendance Calendar */}
           <div className="bg-white rounded-2xl shadow-md p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold" style={{ color: '#0f1f35' }}>📅 June 2026 Attendance Calendar</h3>
-              <div className="flex space-x-2">
+              <h3 className="text-lg font-bold" style={{ color: '#0f1f35' }}>📅 {monthName} Attendance Calendar</h3>
+              <div className="flex flex-wrap gap-2">
                 {[
                   { label: 'P Present', color: '#16a34a' },
-                  { label: 'L Leave', color: '#d4a017' },
-                  { label: 'CV Client', color: '#1e3a5f' },
+                  { label: 'HD Half Day', color: '#d4a017' },
                   { label: 'WO Week Off', color: '#94a3b8' },
                   { label: 'A Absent', color: '#dc2626' },
                 ].map((item) => (
@@ -314,29 +353,26 @@ const Attendance: React.FC<{ navigate?: (page: string) => void }> = ({ navigate 
               </div>
             </div>
 
-            {/* Calendar Grid */}
             <div className="grid grid-cols-7 gap-1 mb-2">
               {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
                 <div key={day} className="text-center text-xs font-bold text-gray-500 py-2">{day}</div>
               ))}
             </div>
             <div className="grid grid-cols-7 gap-1">
-              {Array.from({ length: firstDay }).map((_, i) => (
+              {Array.from({ length: adjustedFirstDay }).map((_, i) => (
                 <div key={`empty-${i}`} className="h-12"></div>
               ))}
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const day = i + 1;
                 const data = attendanceData[day];
-                const isToday = day === 7;
+                const isToday = day === today.getDate();
                 return (
-                  <div
-                    key={day}
-                    className="h-12 rounded-lg flex flex-col items-center justify-center text-xs font-medium transition-all hover:shadow-md cursor-pointer"
+                  <div key={day}
+                    className="h-12 rounded-lg flex flex-col items-center justify-center text-xs font-medium"
                     style={{
                       background: data ? `${data.color}20` : '#f9fafb',
-                      border: isToday ? `2px solid ${data?.color || '#1e3a5f'}` : '1px solid #e5e7eb',
-                    }}
-                  >
+                      border: isToday ? `2px solid #1e3a5f` : '1px solid #e5e7eb',
+                    }}>
                     <span className="text-gray-600">{day}</span>
                     {data && <span style={{ color: data.color }} className="font-bold">{data.status}</span>}
                   </div>
@@ -347,15 +383,15 @@ const Attendance: React.FC<{ navigate?: (page: string) => void }> = ({ navigate 
 
           {/* Monthly Summary */}
           <div className="bg-white rounded-2xl shadow-md p-6">
-            <h3 className="text-lg font-bold mb-4" style={{ color: '#0f1f35' }}>📊 Monthly Summary — June 2026</h3>
+            <h3 className="text-lg font-bold mb-4" style={{ color: '#0f1f35' }}>📊 Monthly Summary — {monthName}</h3>
             <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
               {[
-                { label: 'Present', value: '22', color: '#16a34a' },
-                { label: 'Leave', value: '1', color: '#d4a017' },
-                { label: 'Client Visit', value: '2', color: '#1e3a5f' },
-                { label: 'Week Off', value: '5', color: '#94a3b8' },
-                { label: 'Absent', value: '0', color: '#dc2626' },
-                { label: 'Working Days', value: '25', color: '#7c3aed' },
+                { label: 'Present', value: monthlySummary.present, color: '#16a34a' },
+                { label: 'Leave', value: monthlySummary.leave, color: '#d4a017' },
+                { label: 'Client Visit', value: monthlySummary.clientVisit, color: '#1e3a5f' },
+                { label: 'Week Off', value: monthlySummary.weekOff, color: '#94a3b8' },
+                { label: 'Absent', value: monthlySummary.absent, color: '#dc2626' },
+                { label: 'Working Days', value: monthlySummary.workingDays, color: '#7c3aed' },
               ].map((item) => (
                 <div key={item.label} className="rounded-xl p-4 text-center" style={{ background: '#f0f4ff' }}>
                   <p className="text-2xl font-bold" style={{ color: item.color }}>{item.value}</p>

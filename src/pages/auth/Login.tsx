@@ -1,11 +1,5 @@
 ﻿import React, { useState } from 'react';
-
-const CREDENTIALS: Record<string, { email: string; password: string }> = {
-  admin: { email: 'naresh@dayallohia.com', password: 'Demo@123' },
-  senior: { email: 'senior@dayallohia.com', password: 'Demo@123' },
-  partner: { email: 'partner@dayallohia.com', password: 'Demo@123' },
-  article: { email: 'article1@dayallohia.com', password: 'Demo@123' },
-};
+import { supabase } from '../../services/supabase';
 
 const Login: React.FC<{ onLogin?: (role: string) => void }> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
@@ -15,19 +9,32 @@ const Login: React.FC<{ onLogin?: (role: string) => void }> = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      const valid = CREDENTIALS[role];
-      if (valid && email === valid.email && password === valid.password) {
-        if (onLogin) onLogin(role);
-      } else {
+
+    try {
+      const { data, error: dbError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .eq('password', password)
+        .eq('role', role)
+        .eq('is_active', true)
+        .single();
+
+      if (dbError || !data) {
         setError('Invalid email or password for the selected role.');
+      } else {
+        localStorage.setItem('ams_user', JSON.stringify(data));
+        if (onLogin) onLogin(data.role);
       }
-    }, 1500);
+    } catch (err) {
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -48,30 +55,14 @@ const Login: React.FC<{ onLogin?: (role: string) => void }> = ({ onLogin }) => {
             <div className="w-16 h-1 bg-yellow-400 mx-auto mt-4 rounded"></div>
           </div>
           <div className="mt-12 space-y-4">
-            <div className="flex items-center space-x-3 text-gray-300">
-              <div className="w-8 h-8 rounded-full bg-yellow-500 bg-opacity-20 flex items-center justify-center">
-                <span className="text-yellow-400 text-sm">✓</span>
+            {['ICAI Compliant Articleship Management', 'Automated Leave & Stipend Calculations', 'Real-time Comp-Off & Attendance Tracking', 'Secure Document Management'].map((item) => (
+              <div key={item} className="flex items-center space-x-3 text-gray-300">
+                <div className="w-8 h-8 rounded-full bg-yellow-500 bg-opacity-20 flex items-center justify-center">
+                  <span className="text-yellow-400 text-sm">✓</span>
+                </div>
+                <span>{item}</span>
               </div>
-              <span>ICAI Compliant Articleship Management</span>
-            </div>
-            <div className="flex items-center space-x-3 text-gray-300">
-              <div className="w-8 h-8 rounded-full bg-yellow-500 bg-opacity-20 flex items-center justify-center">
-                <span className="text-yellow-400 text-sm">✓</span>
-              </div>
-              <span>Automated Leave & Stipend Calculations</span>
-            </div>
-            <div className="flex items-center space-x-3 text-gray-300">
-              <div className="w-8 h-8 rounded-full bg-yellow-500 bg-opacity-20 flex items-center justify-center">
-                <span className="text-yellow-400 text-sm">✓</span>
-              </div>
-              <span>Real-time Comp-Off & Attendance Tracking</span>
-            </div>
-            <div className="flex items-center space-x-3 text-gray-300">
-              <div className="w-8 h-8 rounded-full bg-yellow-500 bg-opacity-20 flex items-center justify-center">
-                <span className="text-yellow-400 text-sm">✓</span>
-              </div>
-              <span>Secure Document Management</span>
-            </div>
+            ))}
           </div>
         </div>
       </div>
@@ -101,9 +92,7 @@ const Login: React.FC<{ onLogin?: (role: string) => void }> = ({ onLogin }) => {
                       key={r}
                       type="button"
                       onClick={() => { setRole(r); setError(''); }}
-                      className={`py-2 px-3 rounded-lg text-sm font-medium capitalize transition-all ${
-                        role === r ? 'text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
+                      className={`py-2 px-3 rounded-lg text-sm font-medium capitalize transition-all ${role === r ? 'text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                       style={role === r ? { background: 'linear-gradient(135deg, #1e3a5f, #162d4a)' } : {}}
                     >
                       {r === 'article' ? 'Article' : r === 'senior' ? 'Senior' : r === 'partner' ? 'Partner' : 'Admin'}
@@ -135,26 +124,19 @@ const Login: React.FC<{ onLogin?: (role: string) => void }> = ({ onLogin }) => {
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-all pr-12"
                     required
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     {showPassword ? '🙈' : '👁️'}
                   </button>
                 </div>
               </div>
 
               <div className="flex justify-end">
-                <button type="button" className="text-sm font-medium" style={{ color: '#1e3a5f' }}>
-                  Forgot Password?
-                </button>
+                <button type="button" className="text-sm font-medium" style={{ color: '#1e3a5f' }}>Forgot Password?</button>
               </div>
 
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-lg flex items-center space-x-2">
-                  <span>⚠️</span>
-                  <span>{error}</span>
+                  <span>⚠️</span><span>{error}</span>
                 </div>
               )}
 
@@ -172,20 +154,9 @@ const Login: React.FC<{ onLogin?: (role: string) => void }> = ({ onLogin }) => {
                     </svg>
                     <span>Signing In...</span>
                   </span>
-                ) : (
-                  'Sign In to AMS'
-                )}
+                ) : 'Sign In to AMS'}
               </button>
             </form>
-
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
-              <p className="text-xs text-blue-600 font-medium mb-1">Demo Credentials (select role first):</p>
-              <p className="text-xs text-blue-500">Admin: naresh@dayallohia.com</p>
-              <p className="text-xs text-blue-500">Senior: senior@dayallohia.com</p>
-              <p className="text-xs text-blue-500">Partner: partner@dayallohia.com</p>
-              <p className="text-xs text-blue-500">Article: article1@dayallohia.com</p>
-              <p className="text-xs text-blue-500 mt-1">Password for all: Demo@123</p>
-            </div>
 
             <div className="mt-6 pt-6 border-t border-gray-100 text-center">
               <p className="text-xs text-gray-400">Articleship Management System v1.0</p>

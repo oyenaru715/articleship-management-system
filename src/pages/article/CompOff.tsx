@@ -1,4 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../services/supabase';
+
+interface CompOffRecord {
+  id: string;
+  worked_date: string;
+  comp_off_date?: string;
+  status: 'pending' | 'approved' | 'used';
+  reason?: string;
+  created_at: string;
+}
 
 const CompOff: React.FC<{ navigate?: (page: string) => void }> = ({ navigate }) => {
   const [activeTab, setActiveTab] = useState('apply');
@@ -7,57 +17,115 @@ const CompOff: React.FC<{ navigate?: (page: string) => void }> = ({ navigate }) 
   const [days, setDays] = useState('1');
   const [remarks, setRemarks] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [compOffData, setCompOffData] = useState<CompOffRecord[]>([]);
+  const [userName, setUserName] = useState('');
+  const [userRole, setUserRole] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const userData = localStorage.getItem('ams_user');
+    if (userData) {
+      const user = JSON.parse(userData);
+      setUserName(user.name);
+      setUserRole(user.role);
+      fetchCompOffData(user.id);
+    }
+  }, []);
+
+  const fetchCompOffData = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('comp_off')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setCompOffData(data || []);
+    } catch (err) {
+      console.error('Error fetching comp-off data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!dateWorked || !reason) return;
+
+    setSubmitted(true);
+    const userData = localStorage.getItem('ams_user');
+    if (!userData) return;
+
+    const user = JSON.parse(userData);
+
+    try {
+      const { error } = await supabase
+        .from('comp_off')
+        .insert([
+          {
+            user_id: user.id,
+            worked_date: dateWorked,
+            status: 'pending',
+            reason: reason,
+          }
+        ]);
+
+      if (error) throw error;
+
+      setTimeout(() => {
+        setSubmitted(false);
+        setDateWorked('');
+        setReason('');
+        setRemarks('');
+        setDays('1');
+        setActiveTab('history');
+        fetchCompOffData(user.id);
+      }, 2000);
+    } catch (err) {
+      console.error('Error submitting comp-off request:', err);
+      setSubmitted(false);
+    }
+  };
+
+  const getCompOffStats = () => {
+    const earned = compOffData.filter(c => c.status === 'approved').length;
+    const used = compOffData.filter(c => c.status === 'used').length;
+    const balance = earned - used;
+    return { earned, used, balance };
+  };
+
+  const getStatusColor = (status: string) => {
+    if (status === 'approved') return '#16a34a';
+    if (status === 'used') return '#1e3a5f';
+    return '#d4a017';
+  };
+
+  const getStatusBg = (status: string) => {
+    if (status === 'approved') return '#dcfce7';
+    if (status === 'used') return '#e0e7ff';
+    return '#fef3c7';
+  };
+
+  const getStatusLabel = (status: string) => {
+    if (status === 'approved') return 'Approved';
+    if (status === 'used') return 'Used';
+    return 'Pending';
+  };
 
   const sidebarItems = [
-    { icon: '🏠', label: 'Dashboard', active: false, page: 'dashboard' },
+    { icon: '📊', label: 'Dashboard', active: false, page: 'dashboard' },
     { icon: '📅', label: 'Attendance', active: false, page: 'attendance' },
     { icon: '🌿', label: 'Leave', active: false, page: 'leave' },
-    { icon: '🔄', label: 'Comp-Off', active: true, page: 'compoff' },
+    { icon: '📄', label: 'Comp-Off', active: true, page: 'compoff' },
     { icon: '📄', label: 'Documents', active: false, page: 'documents' },
     { icon: '💰', label: 'Stipend', active: false, page: 'stipend' },
     { icon: '👤', label: 'My Profile', active: false, page: 'profile' },
   ];
 
-  const compOffHistory = [
-    { id: 1, dateWorked: '01 Jun 2026', reason: 'Worked on Sunday - Client Audit', days: 1, status: 'Approved', approver: 'Partner', usedFor: 'Leave Adjustment' },
-    { id: 2, dateWorked: '18 Apr 2026', reason: 'Worked on 2nd Saturday - Tax Filing', days: 1, status: 'Approved', approver: 'Partner', usedFor: 'Available' },
-    { id: 3, dateWorked: '15 Mar 2026', reason: 'Worked on Festival Holiday - Audit', days: 1, status: 'Pending', approver: 'Senior', usedFor: '-' },
-  ];
-
-  const compOffLedger = [
-    { date: '05 Apr 2026', particulars: 'Comp-Off Earned - Worked Sunday 01 Jun', credit: 1, debit: 0, balance: 1 },
-    { date: '20 Apr 2026', particulars: 'Comp-Off Earned - Worked 2nd Saturday 18 Apr', credit: 1, debit: 0, balance: 2 },
-    { date: '02 Jun 2026', particulars: 'Comp-Off Adjusted Against Excess Leave', credit: 0, debit: 1, balance: 1 },
-  ];
-
-  const handleSubmit = () => {
-    if (!dateWorked || !reason) return;
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      setDateWorked('');
-      setReason('');
-      setRemarks('');
-      setDays('1');
-      setActiveTab('history');
-    }, 2000);
-  };
-
-  const getStatusColor = (status: string) => {
-    if (status === 'Approved') return '#16a34a';
-    if (status === 'Rejected') return '#dc2626';
-    return '#d4a017';
-  };
-
-  const getStatusBg = (status: string) => {
-    if (status === 'Approved') return '#dcfce7';
-    if (status === 'Rejected') return '#fee2e2';
-    return '#fef3c7';
-  };
+  const stats = getCompOffStats();
 
   return (
     <div className="min-h-screen" style={{ background: '#f0f4ff' }}>
-
       {/* Top Navigation */}
       <nav style={{ background: 'linear-gradient(135deg, #0f1f35, #1e3a5f)' }} className="px-6 py-4 flex items-center justify-between shadow-lg">
         <div className="flex items-center space-x-3">
@@ -71,17 +139,18 @@ const CompOff: React.FC<{ navigate?: (page: string) => void }> = ({ navigate }) 
         </div>
         <div className="flex items-center space-x-4">
           <div className="text-right">
-            <p className="text-white font-medium text-sm">Naresh Agrawal</p>
-            <p className="text-xs" style={{ color: '#f5c842' }}>Article Assistant</p>
+            <p className="text-white font-medium text-sm">{userName}</p>
+            <p className="text-xs" style={{ color: '#f5c842' }}>
+              {userRole === 'article' ? 'Article Assistant' : userRole === 'senior' ? 'Senior' : 'Partner'}
+            </p>
           </div>
           <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold" style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)' }}>
-            NA
+            {userName.charAt(0)}
           </div>
         </div>
       </nav>
 
       <div className="flex">
-
         {/* Sidebar */}
         <aside className="w-64 min-h-screen shadow-lg" style={{ background: '#0f1f35' }}>
           <div className="p-4 space-y-1 mt-4">
@@ -104,19 +173,18 @@ const CompOff: React.FC<{ navigate?: (page: string) => void }> = ({ navigate }) 
 
         {/* Main Content */}
         <main className="flex-1 p-6 space-y-6">
-
           {/* Header */}
           <div>
-            <h2 className="text-2xl font-bold" style={{ color: '#0f1f35' }}>🔄 Comp-Off Management</h2>
+            <h2 className="text-2xl font-bold" style={{ color: '#0f1f35' }}>📄 Comp-Off Management</h2>
             <p className="text-gray-500 text-sm">Request and track your compensatory off days</p>
           </div>
 
           {/* Comp-Off Wallet */}
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: 'Comp-Off Earned', value: '2', color: '#1e3a5f' },
-              { label: 'Comp-Off Used', value: '1', color: '#d4a017' },
-              { label: 'Available Balance', value: '1', color: '#16a34a' },
+              { label: 'Comp-Off Earned', value: stats.earned.toString(), color: '#1e3a5f' },
+              { label: 'Comp-Off Used', value: stats.used.toString(), color: '#d4a017' },
+              { label: 'Available Balance', value: stats.balance.toString(), color: '#16a34a' },
             ].map((item) => (
               <div key={item.label} className="bg-white rounded-2xl shadow-md p-5 text-center">
                 <p className="text-3xl font-bold" style={{ color: item.color }}>{item.value}</p>
@@ -149,17 +217,17 @@ const CompOff: React.FC<{ navigate?: (page: string) => void }> = ({ navigate }) 
           <div className="bg-white rounded-2xl shadow-md overflow-hidden">
             <div className="flex border-b border-gray-100">
               {[
-                { key: 'apply', label: '📝 Request Comp-Off' },
-                { key: 'history', label: '📋 Request History' },
-                { key: 'ledger', label: '📒 Comp-Off Ledger' },
+                { key: 'apply', label: '📝 Apply' },
+                { key: 'history', label: '📋 History' },
+                { key: 'ledger', label: '📊 Ledger' },
               ].map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className="flex-1 py-4 text-sm font-medium transition-all"
+                  className="flex-1 px-6 py-4 font-medium transition-all"
                   style={{
-                    background: activeTab === tab.key ? 'linear-gradient(135deg, #d4a017, #f5c842)' : 'white',
-                    color: activeTab === tab.key ? '#0f1f35' : '#94a3b8',
+                    color: activeTab === tab.key ? '#1e3a5f' : '#94a3b8',
+                    borderBottom: activeTab === tab.key ? '3px solid #1e3a5f' : 'none',
                   }}
                 >
                   {tab.label}
@@ -167,36 +235,17 @@ const CompOff: React.FC<{ navigate?: (page: string) => void }> = ({ navigate }) 
               ))}
             </div>
 
-            <div className="p-6">
-
-              {/* Apply Comp-Off Tab */}
+            <div className="p-6 space-y-4">
+              {/* Apply Tab */}
               {activeTab === 'apply' && (
-                <div className="space-y-5 max-w-xl">
-                  {submitted ? (
-                    <div className="text-center py-8">
-                      <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: '#dcfce7' }}>
-                        <span className="text-3xl">✅</span>
-                      </div>
-                      <h3 className="text-lg font-bold" style={{ color: '#16a34a' }}>Comp-Off Request Submitted!</h3>
-                      <p className="text-gray-500 text-sm mt-2">Your request has been sent to Senior for recommendation.</p>
-                      <div className="mt-4 flex justify-center space-x-4 text-sm">
-                        <div className="flex items-center space-x-2">
-                          <span style={{ color: '#16a34a' }}>●</span>
-                          <span className="text-gray-600">Article (You)</span>
-                        </div>
-                        <span className="text-gray-300">→</span>
-                        <div className="flex items-center space-x-2">
-                          <span style={{ color: '#d4a017' }}>●</span>
-                          <span className="text-gray-600">Senior</span>
-                        </div>
-                        <span className="text-gray-300">→</span>
-                        <div className="flex items-center space-x-2">
-                          <span style={{ color: '#94a3b8' }}>●</span>
-                          <span className="text-gray-600">Partner</span>
-                        </div>
-                      </div>
+                <>
+                  {submitted && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                      <p className="text-green-600 font-medium">✓ Comp-Off request submitted successfully!</p>
                     </div>
-                  ) : (
+                  )}
+
+                  {!submitted ? (
                     <>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Date Worked</label>
@@ -242,14 +291,6 @@ const CompOff: React.FC<{ navigate?: (page: string) => void }> = ({ navigate }) 
                         />
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Supporting Attachment (Optional)</label>
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-gray-400">
-                          <p className="text-2xl mb-1">📎</p>
-                          <p className="text-sm text-gray-500">Click to upload supporting document</p>
-                        </div>
-                      </div>
-
                       <div className="p-3 rounded-lg" style={{ background: '#f0f4ff' }}>
                         <p className="text-xs" style={{ color: '#1e3a5f' }}>ℹ️ <strong>Note:</strong> Comp-Off can only be requested for Sundays, 2nd & 4th Saturdays, or Festival Holidays when you have worked.</p>
                       </div>
@@ -263,52 +304,41 @@ const CompOff: React.FC<{ navigate?: (page: string) => void }> = ({ navigate }) 
                         Submit Comp-Off Request
                       </button>
                     </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-green-600 font-medium">Submitting your request...</p>
+                    </div>
                   )}
-                </div>
+                </>
               )}
 
               {/* History Tab */}
               {activeTab === 'history' && (
                 <div className="space-y-3">
-                  {compOffHistory.map((item) => (
-                    <div key={item.id} className="rounded-xl p-4 border border-gray-100" style={{ background: '#f9fafb' }}>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium text-gray-800">{item.reason}</p>
-                          <p className="text-sm text-gray-500">Date Worked: {item.dateWorked} • {item.days} day</p>
-                          {item.usedFor !== '-' && (
-                            <p className="text-xs mt-1" style={{ color: '#1e3a5f' }}>Used for: {item.usedFor}</p>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <span
-                            className="px-3 py-1 rounded-full text-xs font-bold"
-                            style={{ background: getStatusBg(item.status), color: getStatusColor(item.status) }}
-                          >
-                            {item.status}
-                          </span>
-                          <p className="text-xs text-gray-400 mt-1">by {item.approver}</p>
+                  {loading ? (
+                    <p className="text-gray-500">Loading comp-off history...</p>
+                  ) : compOffData.length === 0 ? (
+                    <p className="text-gray-500 text-center py-8">No comp-off requests yet</p>
+                  ) : (
+                    compOffData.map((item) => (
+                      <div key={item.id} className="rounded-xl p-4 border border-gray-100" style={{ background: '#f9fafb' }}>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-gray-800">{item.reason}</p>
+                            <p className="text-sm text-gray-500">Date Worked: {new Date(item.worked_date).toLocaleDateString('en-IN')}</p>
+                          </div>
+                          <div className="text-right">
+                            <span
+                              className="px-3 py-1 rounded-full text-xs font-bold"
+                              style={{ background: getStatusBg(item.status), color: getStatusColor(item.status) }}
+                            >
+                              {getStatusLabel(item.status)}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                      <div className="mt-3 flex items-center space-x-2 text-xs">
-                        <span className="px-2 py-1 rounded-full" style={{ background: '#dcfce7', color: '#16a34a' }}>✓ Article</span>
-                        <span className="text-gray-300">→</span>
-                        <span className="px-2 py-1 rounded-full" style={{
-                          background: item.status !== 'Pending' ? '#dcfce7' : '#fef3c7',
-                          color: item.status !== 'Pending' ? '#16a34a' : '#d4a017'
-                        }}>
-                          {item.status !== 'Pending' ? '✓' : '⏳'} Senior
-                        </span>
-                        <span className="text-gray-300">→</span>
-                        <span className="px-2 py-1 rounded-full" style={{
-                          background: item.status === 'Approved' ? '#dcfce7' : item.status === 'Rejected' ? '#fee2e2' : '#f0f4ff',
-                          color: item.status === 'Approved' ? '#16a34a' : item.status === 'Rejected' ? '#dc2626' : '#94a3b8'
-                        }}>
-                          {item.status === 'Approved' ? '✓' : item.status === 'Rejected' ? '✗' : '⏳'} Partner
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               )}
 
@@ -326,33 +356,31 @@ const CompOff: React.FC<{ navigate?: (page: string) => void }> = ({ navigate }) 
                       </tr>
                     </thead>
                     <tbody>
-                      {compOffLedger.map((row, i) => (
-                        <tr key={i} className="border-b border-gray-100" style={{ background: i % 2 === 0 ? 'white' : '#f9fafb' }}>
-                          <td className="px-4 py-3 text-gray-500 text-xs">{row.date}</td>
-                          <td className="px-4 py-3 text-gray-700">{row.particulars}</td>
-                          <td className="px-4 py-3 text-center font-bold" style={{ color: row.credit > 0 ? '#16a34a' : '#94a3b8' }}>
-                            {row.credit > 0 ? `+${row.credit}` : '-'}
+                      {compOffData.map((item, i) => (
+                        <tr key={item.id} className="border-b border-gray-100" style={{ background: i % 2 === 0 ? 'white' : '#f9fafb' }}>
+                          <td className="px-4 py-3 text-gray-500 text-xs">{new Date(item.created_at).toLocaleDateString('en-IN')}</td>
+                          <td className="px-4 py-3 text-gray-700">Comp-Off {item.status === 'approved' ? 'Earned' : item.status === 'used' ? 'Adjusted' : 'Requested'}</td>
+                          <td className="px-4 py-3 text-center font-bold" style={{ color: item.status === 'approved' ? '#16a34a' : '#94a3b8' }}>
+                            {item.status === 'approved' ? '+1' : '-'}
                           </td>
-                          <td className="px-4 py-3 text-center font-bold" style={{ color: row.debit > 0 ? '#dc2626' : '#94a3b8' }}>
-                            {row.debit > 0 ? `-${row.debit}` : '-'}
+                          <td className="px-4 py-3 text-center font-bold" style={{ color: item.status === 'used' ? '#dc2626' : '#94a3b8' }}>
+                            {item.status === 'used' ? '-1' : '-'}
                           </td>
-                          <td className="px-4 py-3 text-center font-bold" style={{ color: '#1e3a5f' }}>{row.balance}</td>
+                          <td className="px-4 py-3 text-center font-bold" style={{ color: '#1e3a5f' }}>{stats.balance}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr style={{ background: '#f0f4ff' }}>
                         <td colSpan={4} className="px-4 py-3 font-bold text-right" style={{ color: '#0f1f35' }}>Available Balance</td>
-                        <td className="px-4 py-3 text-center font-bold text-lg" style={{ color: '#16a34a' }}>1</td>
+                        <td className="px-4 py-3 text-center font-bold text-lg" style={{ color: '#16a34a' }}>{stats.balance}</td>
                       </tr>
                     </tfoot>
                   </table>
                 </div>
               )}
-
             </div>
           </div>
-
         </main>
       </div>
     </div>

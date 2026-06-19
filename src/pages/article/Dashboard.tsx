@@ -1,6 +1,31 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  assigned_to?: string;
+}
 
 const Dashboard: React.FC<{ navigate?: (page: string) => void }> = ({ navigate }) => {
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    // Read logged-in user from localStorage
+    const storedUser = localStorage.getItem('ams_user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase();
+  };
 
   const sidebarItems = [
     { icon: '🏠', label: 'Dashboard', active: true, page: 'dashboard' },
@@ -27,21 +52,21 @@ const Dashboard: React.FC<{ navigate?: (page: string) => void }> = ({ navigate }
           </div>
         </div>
         <div className="flex items-center space-x-4">
-  <div className="text-right">
-    <p className="text-white font-medium text-sm">Naresh Agrawal</p>
-    <p className="text-xs" style={{ color: '#f5c842' }}>Article Assistant</p>
-  </div>
-  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold" style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)' }}>
-    NA
-  </div>
-  <button
-    onClick={() => navigate && navigate('login')}
-    className="px-4 py-2 rounded-lg text-white font-semibold transition-all hover:shadow-md"
-    style={{ background: '#ef4444' }}
-  >
-    🚪 Logout
-  </button>
-</div>
+          <div className="text-right">
+            <p className="text-white font-medium text-sm">{user?.name || 'Loading...'}</p>
+            <p className="text-xs" style={{ color: '#f5c842' }}>Article Assistant</p>
+          </div>
+          <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold" style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)' }}>
+            {user ? getInitials(user.name) : 'NA'}
+          </div>
+          <button
+            onClick={() => navigate && navigate('login')}
+            className="px-4 py-2 rounded-lg text-white font-semibold transition-all hover:shadow-md"
+            style={{ background: '#ef4444' }}
+          >
+            🚪 Logout
+          </button>
+        </div>
       </nav>
 
       <div className="flex">
